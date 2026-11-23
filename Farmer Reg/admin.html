@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Admin – Registered Farmers | Connected Conservation</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .admin-wrap{max-width:1300px;margin:0 auto;padding:0 1rem 2rem}
+    .login-card{max-width:420px;margin:2rem auto}
+    .login-card h2{margin:0 0 .5rem;color:var(--dark)}
+    .toolbar{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin-bottom:.8rem}
+    .toolbar input{flex:1;min-width:220px;margin:0}
+    .toolbar button{margin:0;padding:.6rem 1rem}
+    .stats{display:flex;gap:.8rem;flex-wrap:wrap;margin-bottom:1rem}
+    .stat{background:#e8f5ec;border-radius:10px;padding:.6rem 1rem;color:var(--dark)}
+    .stat b{display:block;font-size:1.4rem}
+    .secondary{background:#fff;color:var(--dark);border:2px solid var(--green)}
+    .secondary:hover{background:#e8f5ec}
+    #err{color:#b3261e;font-weight:600}
+    tr:nth-child(even) td{background:#f2faf5}
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <img src="logo.png" alt="Connected Conservation logo">
+    <span class="brand">Connected Conservation</span>
+  </header>
+
+  <section class="hero">
+    <h1>Registered Chilli Farmers</h1>
+    <p>Staff access only</p>
+  </section>
+
+  <div class="admin-wrap">
+
+    <!-- LOGIN -->
+    <div id="login" class="card login-card">
+      <h2>Staff login</h2>
+      <label>Email <input id="email" type="email" autocomplete="username"></label>
+      <label>Password <input id="password" type="password" autocomplete="current-password"></label>
+      <button id="loginBtn" style="width:100%">Log in</button>
+      <p id="err"></p>
+    </div>
+
+    <!-- DATA -->
+    <div id="app" hidden>
+      <div class="card">
+        <div class="stats">
+          <div class="stat"><b id="count">0</b>Showing</div>
+          <div class="stat"><b id="total">0</b>Total registered</div>
+          <div class="stat"><b id="hectares">0</b>Total hectares</div>
+        </div>
+        <div class="toolbar">
+          <input id="search" placeholder="Search by name, ward, village, water source...">
+          <button id="csv">⬇ Download CSV</button>
+          <button id="refresh" class="secondary">↻ Refresh</button>
+          <button id="logout" class="secondary">Log out</button>
+        </div>
+        <div class="tablewrap"><table id="tbl"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>© Connected Conservation</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script>
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const $ = id => document.getElementById(id);
+    let rows = [];
+
+    $("loginBtn").onclick = login;
+    $("password").addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+    $("logout").onclick = async () => { await db.auth.signOut(); location.reload(); };
+    $("refresh").onclick = load;
+    $("search").oninput = render;
+
+    async function login() {
+      $("err").textContent = "";
+      const { error } = await db.auth.signInWithPassword({
+        email: $("email").value.trim(),
+        password: $("password").value
+      });
+      if (error) { $("err").textContent = error.message; return; }
+      load();
+    }
+
+    async function load() {
+      const { data, error } = await db.from("farmers").select("*").order("created_at", { ascending: false });
+      if (error) { $("err").textContent = error.message; return; }
+      rows = data;
+      $("login").hidden = true;
+      $("app").hidden = false;
+      render();
+    }
+
+    const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const nice = c => c.replace(/_/g, " ").replace(/\b\w/g, m => m.toUpperCase());
+    const fmt = (c, v) => c === "created_at" && v ? new Date(v).toLocaleString() : v;
+
+    function render() {
+      const q = $("search").value.toLowerCase();
+      const list = rows.filter(r => JSON.stringify(r).toLowerCase().includes(q));
+      const cols = rows.length ? Object.keys(rows[0]).filter(c => c !== "id") : [];
+
+      $("count").textContent = list.length;
+      $("total").textContent = rows.length;
+      $("hectares").textContent = rows.reduce((s, r) => s + (Number(r.land_size_ha) || 0), 0).toFixed(1);
+
+      if (!rows.length) { $("tbl").innerHTML = "<tr><td>No registrations yet.</td></tr>"; return; }
+
+      $("tbl").innerHTML =
+        "<tr>" + cols.map(c => `<th>${esc(nice(c))}</th>`).join("") + "</tr>" +
+        list.map(r => "<tr>" + cols.map(c => `<td>${esc(fmt(c, r[c]))}</td>`).join("") + "</tr>").join("");
+    }
+
+    $("csv").onclick = () => {
+      if (!rows.length) return;
+      const cols = Object.keys(rows[0]);
+      const line = r => cols.map(c => `"${String(r[c] ?? "").replace(/"/g, '""')}"`).join(",");
+      const csv = "\uFEFF" + [cols.join(","), ...rows.map(line)].join("\n");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      a.download = "chilli-farmers-" + new Date().toISOString().slice(0, 10) + ".csv";
+      a.click();
+    };
+
+    // Stay logged in after refresh
+    db.auth.getSession().then(({ data }) => { if (data.session) load(); });
+  </script>
+</body>
+</html>
