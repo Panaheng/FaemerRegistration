@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chilli Farmer Registration – Connected Conservation</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <img src="logo.png" alt="Connected Conservation logo">
+    <span class="brand">Connected Conservation</span>
+  </header>
+
+  <section class="hero">
+    <h1>🌶️ Chilli Farmer Registration</h1>
+    <p>Join our chilli programme in the Hwange – Victoria Falls area. Chilli is not eaten by elephants, so it protects your fields and improves your income.</p>
+  </section>
+
+  <main>
+  <form id="form">
+    <fieldset><legend>Personal details of Community Leader</legend>
+      <label>Full name <input name="full_name" required></label>
+      <label>Gender
+        <select name="gender"><option value="">Select</option><option>Female</option><option>Male</option><option>Other</option></select>
+      </label>
+      <label>Age<input name="Age"></label>
+      <label>Phone / WhatsApp <input name="phone" type="tel" required></label>
+      <label>National ID (optional) <input name="national_id"></label>
+    </fieldset>
+
+    <fieldset><legend>Location</legend>
+      <label>District
+        <select name="district" required>
+          <option value="">Select</option><option>Hwange</option><option>Victoria Falls</option><option>Lupane</option><option>Binga</option><option>Other</option>
+        </select>
+      </label>
+      <label>Ward <input name="ward" required></label>
+      <label>Village / Area <input name="village" required></label>
+      <button type="button" id="gps">📍 Use my current location (optional)</button>
+      <input type="hidden" name="gps_lat"><input type="hidden" name="gps_lng">
+      <p id="gpsout"></p>
+    </fieldset>
+
+    <fieldset><legend>Farm details</legend>
+      <label>Participants <input name="Number_members" type="number" min="1"></label>
+      <label>Land available for chilli (hectares) <input name="land_size_ha" type="number" step="0.1" min="0" required></label>
+      <label>Main water source
+        <select name="water_source" required>
+          <option value="">Select</option><option>Borehole</option><option>River / stream</option>
+          <option>Dam / weir</option><option>Piped water</option><option>Well</option><option>Rain only</option>
+        </select>
+      </label>
+      <label>Water availability
+        <select name="water_availability" required>
+          <option value="">Select</option><option>All year round</option>
+          <option>Most of the year</option><option>Rainy season only</option><option>Very limited</option>
+        </select>
+      </label>
+      <label>Irrigation method
+        <select name="irrigation_method"><option value="">Select</option><option>Bucket / watering can</option><option>Drip</option><option>Furrow</option><option>Sprinkler</option><option>None</option></select>
+      </label>
+      <label>Other crops grown <input name="other_crops" placeholder="e.g. maize, sorghum"></label>
+      <label>Chilli growing experience
+        <select name="chilli_experience"><option value="">Select</option><option>None</option><option>Some</option><option>Experienced</option></select>
+      </label>
+    </fieldset>
+
+    <fieldset><legend>Human–wildlife conflict</legend>
+      <label>Elephant crop damage in the last 2 years
+        <select name="elephant_incidents"><option value="">Select</option><option>None</option><option>1–2 times</option><option>3–5 times</option><option>More than 5 times</option></select>
+      </label>
+      <label>Anything else we should know? <textarea name="notes" rows="3"></textarea></label>
+    </fieldset>
+
+    <label class="check">
+      <input type="checkbox" name="consent" required>
+      <span>I agree that my information may be stored and used by Connected Conservation for this programme.</span>
+    </label>
+
+    <button type="submit">Register</button>
+    <p id="msg"></p>
+  </form>
+  </main>
+
+  <footer>© Connected Conservation</footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script>
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const form = document.getElementById("form");
+    const msg = document.getElementById("msg");
+
+    document.getElementById("gps").onclick = () => {
+      navigator.geolocation.getCurrentPosition(p => {
+        form.gps_lat.value = p.coords.latitude.toFixed(6);
+        form.gps_lng.value = p.coords.longitude.toFixed(6);
+        document.getElementById("gpsout").textContent = "Location captured ✔";
+      }, () => alert("Could not get location. You can skip this."));
+    };
+
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(form));
+      data.consent = true;
+      for (const k in data) if (data[k] === "") data[k] = null;
+
+      msg.textContent = "Submitting...";
+      const { error } = await db.from("farmers").insert(data);
+      if (error) { msg.textContent = "Error: " + error.message; return; }
+      form.reset();
+      msg.textContent = "✅ Thank you! You are registered. We will contact you soon.";
+    });
+  </script>
+</body>
+</html>
